@@ -43,7 +43,7 @@
 
       var sample = null;
 
-      loadSample(ctx, 'kicking.mp3', function(err, buf) {
+      loadSample(ctx, 'needle.mp3', function(err, buf) {
         if (err) {
           console.log('error loading sample');
           console.error(err);
@@ -56,35 +56,36 @@
       function go() {
 
         var source = ctx.createBufferSource();
-        source.loop = false;
+        source.loop = true;
         source.buffer = sample;
+        source.channelCountMode = 'explicit';
+        source.channelCount = 2;
+
+        var oscillator = ctx.createOscillator();
+        oscillator.type = 'triangle';
+        oscillator.frequency = 200;
+        oscillator.channelCountMode = 'explicit';
+        oscillator.channelCount = 1;
+
+        // input 0 = source
+        // input 1 = modulator
+        var merger = ctx.createChannelMerger(2);
 
         var processor = ctx.createScriptProcessor(4096, 3, 2);
-        var oscillator = ctx.createOscillator();
-        var merger = ctx.createChannelMerger(3);
-
-        oscillator.type = 'square';
-
         processor.onaudioprocess = function(evt) {
 
-            try {
+          var ib = evt.inputBuffer,
+              ob = evt.outputBuffer;
 
-            var ib = evt.inputBuffer,
-                ob = evt.outputBuffer;
+          var id0 = ib.getChannelData(0),
+              id1 = ib.getChannelData(1),
+              od0 = ob.getChannelData(0),
+              od1 = ob.getChannelData(1),
+              md  = ib.getChannelData(2);
 
-            var id0 = ib.getChannelData(0),
-                id1 = ib.getChannelData(1),
-                od0 = ob.getChannelData(0),
-                od1 = ob.getChannelData(1),
-                md  = ib.getChannelData(2);
-
-            for (var s = 0, l = ob.length; s < l; ++s) {
-              od0[s] = id0[s] * md[s];
-              od1[s] = id1[s] * md[s];
-            }
-
-          } catch (e) { 
-            console.error(e);
+          for (var s = 0, l = ob.length; s < l; ++s) {
+            od0[s] = id0[s] * md[s];
+            od1[s] = id1[s] * md[s];
           }
 
         }
@@ -94,12 +95,10 @@
         merger.connect(processor);
         processor.connect(ctx.destination);
 
-        console.log(oscillator);
-
         source.start(0);
         oscillator.start(0);
+      
       }
-
 
     }
   </script>
