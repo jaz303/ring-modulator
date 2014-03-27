@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>Ring Modulator</title>
+  <script>
+    function createAudioContext() {
+      var ctor = window.audioContext || window.webkitAudioContext;
+      if (ctor) {
+        return new ctor();
+      } else {
+        throw new Error("couldn't initialise audio");
+      }
+    }
+
+    var ctx = null;
+
+    function loadSample(ctx, url, cb) {
+
+      var req = new XMLHttpRequest();
+      req.open('GET', url, true);
+      req.responseType = 'arraybuffer';
+
+      req.onload = function() {
+        ctx.decodeAudioData(req.response, function(buf) {
+          cb(null, buf);
+        }, function(err) {
+          cb(err);
+        });
+      }
+
+      req.onerror = function(err) {
+        cb(err);
+      }
+
+      req.send();
+
+    }
+
+    function init() {
+
+      ctx = createAudioContext();
+
+      var sample = null;
+
+      loadSample(ctx, 'kicking.mp3', function(err, buf) {
+        if (err) {
+          console.log('error loading sample');
+          console.error(err);
+        } else {
+          sample = buf;
+          go(); 
+        }
+      });
+
+      function go() {
+
+        var source = ctx.createBufferSource();
+        source.loop = false;
+        source.buffer = sample;
+
+        var processor = ctx.createScriptProcessor(4096, 3, 2);
+        var oscillator = ctx.createOscillator();
+        var merger = ctx.createChannelMerger(3);
+
+        oscillator.type = 'square';
+
+        processor.onaudioprocess = function(evt) {
+
+            try {
+
+            var ib = evt.inputBuffer,
+                ob = evt.outputBuffer;
+
+            var id0 = ib.getChannelData(0),
+                id1 = ib.getChannelData(1),
+                od0 = ob.getChannelData(0),
+                od1 = ob.getChannelData(1),
+                md  = ib.getChannelData(2);
+
+            for (var s = 0, l = ob.length; s < l; ++s) {
+              od0[s] = id0[s] * md[s];
+              od1[s] = id1[s] * md[s];
+            }
+
+          } catch (e) { 
+            console.error(e);
+          }
+
+        }
+
+        source.connect(merger, 0, 0);
+        oscillator.connect(merger, 0, 1);
+        merger.connect(processor);
+        processor.connect(ctx.destination);
+
+        console.log(oscillator);
+
+        source.start(0);
+        oscillator.start(0);
+      }
+
+
+    }
+  </script>
+</head>
+<body onload='init()'>
+  
+
+</body>
+</html>
